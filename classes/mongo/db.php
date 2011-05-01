@@ -118,8 +118,7 @@ class Mongo_DB {
 		try
 		{
 			$this->connection = new \Mongo(trim($connection_string), $options);
-			$this->db = $this->connection->{$config['database']};
-			return $this;	
+			$this->db = $this->connection->selectDB($config['database']);
 		} 
 		catch (MongoConnectionException $e)
 		{
@@ -140,11 +139,39 @@ class Mongo_DB {
 	*	Drop a Mongo database
 	*	@usage $mongodb->drop_db("foobar");
 	*/
-	public static function drop_db($database = null)
+	public function switch_db($database = '')
 	{
 		if (empty($database))
 		{
-			throw new \Mongo_Exception('Failed to drop MongoDB database because name is empty');
+			show_error("To switch MongoDB databases, a new database name must be specified", 500);
+		}
+		
+		$this->dbname = $database;
+		
+		try
+		{
+			$this->db = $this->connection->{$this->dbname};
+			return (TRUE);
+		}
+		catch (Exception $e)
+		{
+			show_error("Unable to switch Mongo Databases: {$e->getMessage()}", 500);
+		}
+	}
+		
+	/**
+	*	--------------------------------------------------------------------------------
+	*	Drop_db
+	*	--------------------------------------------------------------------------------
+	*
+	*	Drop a Mongo database
+	*	@usage: $mongodb->drop_db("foobar");
+	*/
+	public function drop_db($database = '')
+	{
+		if (empty($database))
+		{
+			show_error('Failed to drop MongoDB database because name is empty', 500);
 		}
 		
 		else
@@ -152,11 +179,11 @@ class Mongo_DB {
 			try
 			{
 				$this->connection->{$database}->drop();
-				return true;
+				return (TRUE);
 			}
 			catch (Exception $e)
 			{
-				throw new \Mongo_Exception("Unable to drop Mongo database `{$database}`: {$e->getMessage()}");
+				show_error("Unable to drop Mongo database `{$database}`: {$e->getMessage()}", 500);
 			}
 			
 		}
@@ -168,18 +195,18 @@ class Mongo_DB {
 	*	--------------------------------------------------------------------------------
 	*
 	*	Drop a Mongo collection
-	*	@usage $mongodb->drop_collection('foo', 'bar');
+	*	@usage: $mongodb->drop_collection('foo', 'bar');
 	*/
-	public static function drop_collection($db = "", $col = "")
+	public function drop_collection($db = "", $col = "")
 	{
 		if (empty($db))
 		{
-			throw new \Mongo_Exception('Failed to drop MongoDB collection because database name is empty');
+			show_error('Failed to drop MongoDB collection because database name is empty', 500);
 		}
 	
 		if (empty($col))
 		{
-			throw new \Mongo_Exception('Failed to drop MongoDB collection because collection name is empty');
+			show_error('Failed to drop MongoDB collection because collection name is empty', 500);
 		}
 		
 		else
@@ -187,13 +214,15 @@ class Mongo_DB {
 			try
 			{
 				$this->connection->{$db}->{$col}->drop();
-				return true;
+				return TRUE;
 			}
 			catch (Exception $e)
 			{
-				throw new \Mongo_Exception("Unable to drop Mongo collection `{$col}`: {$e->getMessage()}");
+				show_error("Unable to drop Mongo collection `{$col}`: {$e->getMessage()}", 500);
 			}
 		}
+		
+		return($this);
 	}
 	
 	/**
@@ -206,8 +235,9 @@ class Mongo_DB {
 	*	$includes array will take precedence over the $excludes array.  If you want to 
 	*	only choose fields to exclude, leave $includes an empty array().
 	*
-	*	@usage $mongodb->select(array('foo', 'bar'))->get('foobar');
+	*	@usage: $mongodb->select(array('foo', 'bar'))->get('foobar');
 	*/
+	
 	public function select($includes = array(), $excludes = array())
 	{
 	 	if ( ! is_array($includes))
@@ -246,17 +276,17 @@ class Mongo_DB {
 	*	be an associative array with the field as the key and the value as the search
 	*	criteria.
 	*
-	*	@usage $mongodb->where(array('foo' => 'bar'))->get('foobar');
+	*	@usage : $mongodb->where(array('foo' => 'bar'))->get('foobar');
 	*/
 	
 	public function where($wheres = array())
-	 {
-	 	foreach ($wheres as $wh => $val)
-	 	{
-	 		$this->wheres[$wh] = $val;
-	 	}
-	 	return $this;
-	 }
+	{
+		foreach ($wheres as $wh => $val)
+		{
+			$this->wheres[$wh] = $val;
+		}
+		return $this;
+	}
 	
 	/**
 	*	--------------------------------------------------------------------------------
@@ -265,7 +295,7 @@ class Mongo_DB {
 	*
 	*	Get the documents where the value of a $field may be something else
 	*
-	*	@usage $mongodb->or_where(array( array('foo'=>'bar', 'bar'=>'foo' ))->get('foobar');
+	*	@usage : $mongodb->or_where(array('foo'=>'bar', 'bar'=>'foo' ))->get('foobar');
 	*/
 	
 	public function or_where($wheres = array())
@@ -292,8 +322,9 @@ class Mongo_DB {
 	*
 	*	Get the documents where the value of a $field is in a given $in array().
 	*
-	*	@usage $mongodb->where_in('foo', array('bar', 'zoo', 'blah'))->get('foobar');
+	*	@usage : $mongodb->where_in('foo', array('bar', 'zoo', 'blah'))->get('foobar');
 	*/
+	
 	public function where_in($field = "", $in = array())
 	{
 		$this->_where_init($field);
@@ -308,7 +339,7 @@ class Mongo_DB {
 	*
 	*	Get the documents where the value of a $field is in all of a given $in array().
 	*
-	*	@usage $mongodb->where_in('foo', array('bar', 'zoo', 'blah'))->get('foobar');
+	*	@usage : $mongodb->where_in('foo', array('bar', 'zoo', 'blah'))->get('foobar');
 	*/
 	
 	public function where_in_all($field = "", $in = array())
@@ -325,7 +356,7 @@ class Mongo_DB {
 	*
 	*	Get the documents where the value of a $field is not in a given $in array().
 	*
-	*	@usage $mongodb->where_not_in('foo', array('bar', 'zoo', 'blah'))->get('foobar');
+	*	@usage : $mongodb->where_not_in('foo', array('bar', 'zoo', 'blah'))->get('foobar');
 	*/
 	
 	public function where_not_in($field = "", $in = array())
@@ -342,7 +373,7 @@ class Mongo_DB {
 	*
 	*	Get the documents where the value of a $field is greater than $x
 	*
-	*	@usage $mongodb->where_gt('foo', 20);
+	*	@usage : $mongodb->where_gt('foo', 20);
 	*/
 	
 	public function where_gt($field = "", $x)
@@ -359,7 +390,7 @@ class Mongo_DB {
 	*
 	*	Get the documents where the value of a $field is greater than or equal to $x
 	*
-	*	@usage $mongodb->where_gte('foo', 20);
+	*	@usage : $mongodb->where_gte('foo', 20);
 	*/
 	
 	public function where_gte($field = "", $x)
@@ -376,7 +407,7 @@ class Mongo_DB {
 	*
 	*	Get the documents where the value of a $field is less than $x
 	*
-	*	@usage $mongodb->where_lt('foo', 20);
+	*	@usage : $mongodb->where_lt('foo', 20);
 	*/
 	
 	public function where_lt($field = "", $x)
@@ -393,7 +424,7 @@ class Mongo_DB {
 	*
 	*	Get the documents where the value of a $field is less than or equal to $x
 	*
-	*	@usage $mongodb->where_lte('foo', 20);
+	*	@usage : $mongodb->where_lte('foo', 20);
 	*/
 	
 	public function where_lte($field = "", $x)
@@ -410,7 +441,7 @@ class Mongo_DB {
 	*
 	*	Get the documents where the value of a $field is between $x and $y
 	*
-	*	@usage $mongodb->where_between('foo', 20, 30);
+	*	@usage : $mongodb->where_between('foo', 20, 30);
 	*/
 	
 	public function where_between($field = "", $x, $y)
@@ -428,7 +459,7 @@ class Mongo_DB {
 	*
 	*	Get the documents where the value of a $field is between but not equal to $x and $y
 	*
-	*	@usage $mongodb->where_between_ne('foo', 20, 30);
+	*	@usage : $mongodb->where_between_ne('foo', 20, 30);
 	*/
 	
 	public function where_between_ne($field = "", $x, $y)
@@ -446,7 +477,7 @@ class Mongo_DB {
 	*
 	*	Get the documents where the value of a $field is not equal to $x
 	*
-	*	@usage $mongodb->where_not_equal('foo', 1)->get('foobar');
+	*	@usage : $mongodb->where_not_equal('foo', 1)->get('foobar');
 	*/
 	
 	public function where_ne($field = '', $x)
@@ -463,7 +494,7 @@ class Mongo_DB {
 	*
 	*	Get the documents nearest to an array of coordinates (your collection must have a geospatial index)
 	*
-	*	@usage $mongodb->where_near('foo', array('50','50'))->get('foobar');
+	*	@usage : $mongodb->where_near('foo', array('50','50'))->get('foobar');
 	*/
 	
 	function where_near($field = '', $co = array())
@@ -500,7 +531,7 @@ class Mongo_DB {
 	*	to the search value, representing only searching for a value at the end of 
 	*	a line.
 	*
-	*	@usage $mongodb->like('foo', 'bar', 'im', FALSE, TRUE);
+	*	@usage : $mongodb->like('foo', 'bar', 'im', FALSE, TRUE);
 	*/
 	
 	public function like($field = "", $value = "", $flags = "i", $enable_start_wildcard = TRUE, $enable_end_wildcard = TRUE)
@@ -534,7 +565,7 @@ class Mongo_DB {
 	*	you must pass values of either -1, FALSE, 'desc', or 'DESC', else they will be
 	*	set to 1 (ASC).
 	*
-	*	@usage $mongodb->where_between('foo', 20, 30);
+	*	@usage : $mongodb->where_between('foo', 20, 30);
 	*/
 	
 	public function order_by($fields = array())
@@ -560,7 +591,7 @@ class Mongo_DB {
 	*
 	*	Limit the result set to $x number of documents
 	*
-	*	@usage $mongodb->limit($x);
+	*	@usage : $mongodb->limit($x);
 	*/
 	
 	public function limit($x = 99999)
@@ -579,7 +610,7 @@ class Mongo_DB {
 	*
 	*	Offset the result set to skip $x number of documents
 	*
-	*	@usage $mongodb->offset($x);
+	*	@usage : $mongodb->offset($x);
 	*/
 	
 	public function offset($x = 0)
@@ -598,12 +629,12 @@ class Mongo_DB {
 	*
 	*	Get the documents based upon the passed parameters
 	*
-	*	@usage $mongodb->get_where('foo', array('bar' => 'something'));
+	*	@usage : $mongodb->get_where('foo', array('bar' => 'something'));
 	*/
 	
-	public function get_where($collection = "", $where = array(), $limit = 99999)
+	public function get_where($collection = "", $where = array())
 	{
-		return ($this->where($where)->limit($limit)->get($collection));
+		return ($this->where($where)->get($collection));
 	}
 	
 	/**
@@ -613,33 +644,47 @@ class Mongo_DB {
 	*
 	*	Get the documents based upon the passed parameters
 	*
-	*	@usage $mongodb->get('foo', array('bar' => 'something'));
+	*	@usage : $mongodb->get('foo', array('bar' => 'something'));
 	*/
 	
 	 public function get($collection = "")
 	 {
 	 	if (empty($collection))
 	 	{
-	 		throw new \Mongo_Exception("In order to retreive documents from MongoDB");
+	 		show_error("In order to retreive documents from MongoDB, a collection name must be passed", 500);
 	 	}
-	 	
-	 	$results = array();
 	 	
 	 	$documents = $this->db->{$collection}->find($this->wheres, $this->selects)->limit((int) $this->limit)->skip((int) $this->offset)->sort($this->sorts);
 	 	
+	 	// Clear
+	 	$this->_clear();
+	 	
 	 	$returns = array();
-	 	
-	 	if ($documents && count($documents) > 0)
-	 	{
-		 	foreach ($documents as $doc)
-		 	{
-		 		$returns[] = $doc;
-		 	}
-	 	}
-	 	
-		return (object)$returns;
+	
+		while ($documents->hasNext())
+		{
+		    $returns[] = (object) $documents->getNext();
+		}
+		
+		return $returns;
 	 }
-	 
+	
+
+	/**
+	*	--------------------------------------------------------------------------------
+	*	GET ONE
+	*	--------------------------------------------------------------------------------
+	*
+	*	Get the documents based upon the passed parameters
+	*
+	*	@usage : $mongodb->get('foo', array('bar' => 'something'));
+	*/
+
+	public function get_one($collection = "")
+	{
+		return array_shift($this->limit(1)->get($collection)) ?: null;
+	}
+	
 	/**
 	*	--------------------------------------------------------------------------------
 	*	COUNT
@@ -647,13 +692,14 @@ class Mongo_DB {
 	*
 	*	Count the documents based upon the passed parameters
 	*
-	*	@usage $mongodb->get('foo');
+	*	@usage : $mongodb->get('foo');
 	*/
 	
-	public function count($collection = "") {
+	public function count($collection = "")
+	{
 		if (empty($collection))
 		{
-			throw new \Mongo_Exception("In order to retreive a count of documents from MongoDB");
+			show_error("In order to retreive a count of documents from MongoDB, a collection name must be passed", 500);
 		}
 		
 		$count = $this->db->{$collection}->find($this->wheres)->limit((int) $this->limit)->skip((int) $this->offset)->count();
@@ -668,20 +714,19 @@ class Mongo_DB {
 	*
 	*	Insert a new document into the passed collection
 	*
-	*	@usage $mongodb->insert('foo', $data = array());
-string|bool
+	*	@usage : $mongodb->insert('foo', $data = array());
 	*/
 	
 	public function insert($collection = "", $insert = array())
 	{
 		if (empty($collection))
 		{
-			throw new \Mongo_Exception("No Mongo collection selected to insert into");
+			show_error("No Mongo collection selected to insert into", 500);
 		}
 		
 		if (count($insert) == 0 || !is_array($insert))
 		{
-			throw new \Mongo_Exception("Nothing to insert into Mongo collection or insert is not an array");
+			show_error("Nothing to insert into Mongo collection or insert is not an array", 500);
 		}
 		
 		try
@@ -698,7 +743,7 @@ string|bool
 		}
 		catch (MongoCursorException $e)
 		{
-			throw new \Mongo_Exception("Insert of data into MongoDB failed: {$e->getMessage()}");
+			show_error("Insert of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
 	}
 	
@@ -709,19 +754,19 @@ string|bool
 	*
 	*	Updates a single document
 	*
-	*	@usage $mongodb->update('foo', $data = array());
+	*	@usage: $mongodb->update('foo', $data = array());
 	*/
 	
 	public function update($collection = "", $data = array(), $options = array())
 	{
 		if (empty($collection))
 		{
-			throw new \Mongo_Exception("No Mongo collection selected to update");
+			show_error("No Mongo collection selected to update", 500);
 		}
 		
 		if (count($data) == 0 || ! is_array($data))
 		{
-			throw new \Mongo_Exception("Nothing to update in Mongo collection or update is not an array");
+			show_error("Nothing to update in Mongo collection or update is not an array", 500);
 		}
 		
 		try
@@ -729,11 +774,11 @@ string|bool
 			$options = array_merge($options, array('fsync' => TRUE, 'multiple' => FALSE));
 			$this->db->{$collection}->update($this->wheres, array('$set' => $data), $options);
 			$this->_clear();
-			return true;
+			return (TRUE);
 		}
 		catch (MongoCursorException $e)
 		{
-			throw new \Mongo_Exception("Update of data into MongoDB failed: {$e->getMessage()}");
+			show_error("Update of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
 		
 	}
@@ -745,30 +790,30 @@ string|bool
 	*
 	*	Updates a collection of documents
 	*
-	*	@usage $mongodb->update_all('foo', $data = array());
+	*	@usage: $mongodb->update_all('foo', $data = array());
 	*/
 	
 	public function update_all($collection = "", $data = array())
 	{
 		if (empty($collection))
 		{
-			throw new \Mongo_Exception("No Mongo collection selected to update");
+			show_error("No Mongo collection selected to update", 500);
 		}
 		
 		if (count($data) == 0 || ! is_array($data))
 		{
-			throw new \Mongo_Exception("Nothing to update in Mongo collection or update is not an array");
+			show_error("Nothing to update in Mongo collection or update is not an array", 500);
 		}
 		
 		try
 		{
 			$this->db->{$collection}->update($this->wheres, array('$set' => $data), array('fsync' => TRUE, 'multiple' => TRUE));
 			$this->_clear();
-			return true;
+			return (TRUE);
 		}
 		catch (MongoCursorException $e)
 		{
-			throw new \Mongo_Exception("Update of data into MongoDB failed: {$e->getMessage()}");
+			show_error("Update of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
 	}
 	
@@ -779,25 +824,25 @@ string|bool
 	*
 	*	delete document from the passed collection based upon certain criteria
 	*
-	*	@usage $mongodb->delete('foo', $data = array());
+	*	@usage : $mongodb->delete('foo', $data = array());
 	*/
 	
 	public function delete($collection = "")
 	{
 		if (empty($collection))
 		{
-			throw new \Mongo_Exception("No Mongo collection selected to delete from");
+			show_error("No Mongo collection selected to delete from", 500);
 		}
 		
 		try
 		{
-			$this->db->{$collection}->remove($this->wheres, array('fsync' => TRUE, 'justOne' => TRUE));
+			$this->db->{$collection}->remove($this->wheres, array('safe' => TRUE, 'justOne' => TRUE));
 			$this->_clear();
-			return true;
+			return (TRUE);
 		}
 		catch (MongoCursorException $e)
 		{
-			throw new \Mongo_Exception("Delete of data into MongoDB failed: {$e->getMessage()}");
+			show_error("Delete of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
 		
 	}
@@ -809,25 +854,25 @@ string|bool
 	*
 	*	Delete all documents from the passed collection based upon certain criteria
 	*
-	*	@usage $mongodb->delete_all('foo', $data = array());
+	*	@usage : $mongodb->delete_all('foo', $data = array());
 	*/
 	
 	 public function delete_all($collection = "")
 	 {
 		if (empty($collection))
 		{
-			throw new \Mongo_Exception("No Mongo collection selected to delete from");
+			show_error("No Mongo collection selected to delete from", 500);
 		}
 		
 		try
 		{
-			$this->db->{$collection}->remove($this->wheres, array('fsync' => TRUE, 'justOne' => FALSE));
+			$this->db->{$collection}->remove($this->wheres, array('safe' => TRUE, 'justOne' => FALSE));
 			$this->_clear();
-			return true;
+			return (TRUE);
 		}
 		catch (MongoCursorException $e)
 		{
-			throw new \Mongo_Exception("Delete of data into MongoDB failed: {$e->getMessage()}");
+			show_error("Delete of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
 		
 	}
@@ -840,7 +885,7 @@ string|bool
 	*	Runs a MongoDB command (such as GeoNear). See the MongoDB documentation for more usage scenarios:
 	*	http://dochub.mongodb.org/core/commands
 	*
-	*	@usage $mongodb->command(array('geoNear'=>'buildings', 'near'=>array(53.228482, -0.547847), 'num' => 10, 'nearSphere'=>TRUE));
+	*	@usage : $mongodb->command(array('geoNear'=>'buildings', 'near'=>array(53.228482, -0.547847), 'num' => 10, 'nearSphere'=>true));
 	*/
 	
 	public function command($query = array())
@@ -853,7 +898,7 @@ string|bool
 		
 		catch (MongoCursorException $e)
 		{
-			throw new \Mongo_Exception("MongoDB command failed to execute: {$e->getMessage()}");
+			show_error("MongoDB command failed to execute: {$e->getMessage()}", 500);
 		}
 	}
 	
@@ -866,19 +911,19 @@ string|bool
 	*	you must pass values of either -1, FALSE, 'desc', or 'DESC', else they will be
 	*	set to 1 (ASC).
 	*
-	*	@usage $mongodb->add_index($collection, array('first_name' => 'ASC', 'last_name' => -1), array('unique' => TRUE));
+	*	@usage : $mongodb->add_index($collection, array('first_name' => 'ASC', 'last_name' => -1), array('unique' => TRUE));
 	*/
 	
 	public function add_index($collection = "", $keys = array(), $options = array())
 	{
 		if (empty($collection))
 		{
-			throw new \Mongo_Exception("No Mongo collection specified to add index to");
+			show_error("No Mongo collection specified to add index to", 500);
 		}
 		
 		if (empty($keys) || ! is_array($keys))
 		{
-			throw new \Mongo_Exception("Index could not be created to MongoDB Collection because no keys were specified");
+			show_error("Index could not be created to MongoDB Collection because no keys were specified", 500);
 		}
 
 		foreach ($keys as $col => $val)
@@ -900,7 +945,7 @@ string|bool
 		}
 		else
 		{
-			throw new \Mongo_Exception("An error occured when trying to add an index to MongoDB Collection");
+			show_error("An error occured when trying to add an index to MongoDB Collection", 500);
 		}
 	}
 	
@@ -915,19 +960,19 @@ string|bool
 	*	you must pass values of either -1, FALSE, 'desc', or 'DESC', else they will be
 	*	set to 1 (ASC).
 	*
-	*	@usage $mongodb->remove_index($collection, array('first_name' => 'ASC', 'last_name' => -1));
+	*	@usage : $mongodb->remove_index($collection, array('first_name' => 'ASC', 'last_name' => -1));
 	*/
 	
 	public function remove_index($collection = "", $keys = array())
 	{
 		if (empty($collection))
 		{
-			throw new \Mongo_Exception("No Mongo collection specified to remove index from");
+			show_error("No Mongo collection specified to remove index from", 500);
 		}
 		
 		if (empty($keys) || ! is_array($keys))
 		{
-			throw new \Mongo_Exception("Index could not be removed from MongoDB Collection because no keys were specified");
+			show_error("Index could not be removed from MongoDB Collection because no keys were specified", 500);
 		}
 		
 		if ($this->db->{$collection}->deleteIndex($keys, $options) == TRUE)
@@ -937,7 +982,7 @@ string|bool
 		}
 		else
 		{
-			throw new \Mongo_Exception("An error occured when trying to remove an index from MongoDB Collection");
+			show_error("An error occured when trying to remove an index from MongoDB Collection", 500);
 		}
 	}
 	
@@ -948,14 +993,13 @@ string|bool
 	*
 	*	Remove all indexes from a collection.
 	*
-	*	@usage $mongodb->remove_all_index($collection);
+	*	@usage : $mongodb->remove_all_index($collection);
 	*/
-	
 	public function remove_all_indexes($collection = "")
 	{
 		if (empty($collection))
 		{
-			throw new \Mongo_Exception("No Mongo collection specified to remove all indexes from");
+			show_error("No Mongo collection specified to remove all indexes from", 500);
 		}
 		$this->db->{$collection}->deleteIndexes();
 		$this->_clear();
@@ -969,19 +1013,19 @@ string|bool
 	*
 	*	Lists all indexes in a collection.
 	*
-	*	@usage $mongodb->list_indexes($collection);
+	*	@usage : $mongodb->list_indexes($collection);
 	*/
 	public function list_indexes($collection = "")
 	{
 		if (empty($collection))
 		{
-			throw new \Mongo_Exception("No Mongo collection specified to remove all indexes from");
+			show_error("No Mongo collection specified to remove all indexes from", 500);
 		}
 		
 		return ($this->db->{$collection}->getIndexInfo());
 	}
 	
-
+	 
 	/**
 	*	--------------------------------------------------------------------------------
 	*	_clear
