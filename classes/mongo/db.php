@@ -151,7 +151,7 @@ class Mongo_DB {
 		try
 		{
 			$this->db = $this->connection->{$this->dbname};
-			return (TRUE);
+			return true;
 		}
 		catch (Exception $e)
 		{
@@ -179,7 +179,7 @@ class Mongo_DB {
 			try
 			{
 				$this->connection->{$database}->drop();
-				return (TRUE);
+				return true;
 			}
 			catch (Exception $e)
 			{
@@ -660,7 +660,7 @@ class Mongo_DB {
 	 {
 	 	if (empty($collection))
 	 	{
-	 		show_error("In order to retreive documents from MongoDB, a collection name must be passed", 500);
+	 		show_error("In order to retrieve documents from MongoDB, a collection name must be passed", 500);
 	 	}
 	
 		// If the ID is not an instance of MongoId (most likely a string) it will fail to match, so convert it
@@ -668,7 +668,7 @@ class Mongo_DB {
 		{
 			$this->wheres['_id'] = new \MongoId($this->wheres['_id']);
 		}
-	 	
+		
 	 	$documents = $this->db->{$collection}->find($this->wheres, $this->selects)->limit((int) $this->limit)->skip((int) $this->offset)->sort($this->sorts);
 	 	
 	 	// Clear
@@ -715,6 +715,12 @@ class Mongo_DB {
 		if (empty($collection))
 		{
 			show_error("In order to retreive a count of documents from MongoDB, a collection name must be passed", 500);
+		}
+		
+		// If the ID is not an instance of MongoId (most likely a string) it will fail to match, so convert it
+		if (isset($this->wheres['_id']) and ! ($this->wheres['_id'] instanceof \MongoId))
+		{
+			$this->wheres['_id'] = new \MongoId($this->wheres['_id']);
 		}
 		
 		$count = $this->db->{$collection}->find($this->wheres)->limit((int) $this->limit)->skip((int) $this->offset)->count();
@@ -784,18 +790,24 @@ class Mongo_DB {
 			show_error("Nothing to update in Mongo collection or update is not an array", 500);
 		}
 		
+		// If the ID is not an instance of MongoId (most likely a string) it will fail to match, so convert it
+		if (isset($this->wheres['_id']) and ! ($this->wheres['_id'] instanceof \MongoId))
+		{
+			$this->wheres['_id'] = new \MongoId($this->wheres['_id']);
+		}
+		
 		try
 		{
 			$options = array_merge($options, array('fsync' => TRUE, 'multiple' => FALSE));
+			
 			$this->db->{$collection}->update($this->wheres, array('$set' => $data), $options);
 			$this->_clear();
-			return (TRUE);
+			return true;
 		}
 		catch (MongoCursorException $e)
 		{
 			show_error("Update of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
-		
 	}
 	
 	/**
@@ -824,7 +836,7 @@ class Mongo_DB {
 		{
 			$this->db->{$collection}->update($this->wheres, array('$set' => $data), array('fsync' => TRUE, 'multiple' => TRUE));
 			$this->_clear();
-			return (TRUE);
+			return true;
 		}
 		catch (MongoCursorException $e)
 		{
@@ -849,17 +861,24 @@ class Mongo_DB {
 			show_error("No Mongo collection selected to delete from", 500);
 		}
 		
+		// If the ID is not an instance of MongoId (most likely a string) it will fail to match, so convert it
+		if (isset($this->wheres['_id']) and ! ($this->wheres['_id'] instanceof \MongoId))
+		{
+			$this->wheres['_id'] = new \MongoId($this->wheres['_id']);
+		}
+		
 		try
 		{
+			var_dump($this->wheres);
+			
 			$this->db->{$collection}->remove($this->wheres, array('safe' => TRUE, 'justOne' => TRUE));
 			$this->_clear();
-			return (TRUE);
+			return true;
 		}
 		catch (MongoCursorException $e)
 		{
 			show_error("Delete of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
-		
 	}
 	
 	/**
@@ -883,13 +902,12 @@ class Mongo_DB {
 		{
 			$this->db->{$collection}->remove($this->wheres, array('safe' => TRUE, 'justOne' => FALSE));
 			$this->_clear();
-			return (TRUE);
+			return true;
 		}
 		catch (MongoCursorException $e)
 		{
 			show_error("Delete of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
-		
 	}
 	
 	/**
