@@ -279,12 +279,21 @@ class Mongo_DB {
 	*	@usage : $mongodb->where(array('foo' => 'bar'))->get('foobar');
 	*/
 	
-	public function where($wheres = array())
+	public function where($wheres, $value = null)
 	{
-		foreach ($wheres as $wh => $val)
+		if (is_array($wheres))
 		{
-			$this->wheres[$wh] = $val;
+			foreach ($wheres as $wh => $val)
+			{
+				$this->wheres[$wh] = $val;
+			}
 		}
+		
+		else
+		{
+			$this->wheres[$wheres] = $value;
+		}
+		
 		return $this;
 	}
 	
@@ -653,6 +662,12 @@ class Mongo_DB {
 	 	{
 	 		show_error("In order to retreive documents from MongoDB, a collection name must be passed", 500);
 	 	}
+	
+		// If the ID is not an instance of MongoId (most likely a string) it will fail to match, so convert it
+		if (isset($this->wheres['_id']) and ! ($this->wheres['_id'] instanceof \MongoId))
+		{
+			$this->wheres['_id'] = new \MongoId($this->wheres['_id']);
+		}
 	 	
 	 	$documents = $this->db->{$collection}->find($this->wheres, $this->selects)->limit((int) $this->limit)->skip((int) $this->offset)->sort($this->sorts);
 	 	
