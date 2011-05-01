@@ -143,7 +143,7 @@ class Mongo_DB {
 	{
 		if (empty($database))
 		{
-			show_error("To switch MongoDB databases, a new database name must be specified", 500);
+			throw new \Mongo_Exception("To switch MongoDB databases, a new database name must be specified");
 		}
 		
 		$this->dbname = $database;
@@ -155,7 +155,7 @@ class Mongo_DB {
 		}
 		catch (Exception $e)
 		{
-			show_error("Unable to switch Mongo Databases: {$e->getMessage()}", 500);
+			throw new \Mongo_Exception("Unable to switch Mongo Databases: {$e->getMessage()}", 500);
 		}
 	}
 		
@@ -171,7 +171,7 @@ class Mongo_DB {
 	{
 		if (empty($database))
 		{
-			show_error('Failed to drop MongoDB database because name is empty', 500);
+			throw new \Mongo_Exception('Failed to drop MongoDB database because name is empty', 500);
 		}
 		
 		else
@@ -183,7 +183,7 @@ class Mongo_DB {
 			}
 			catch (Exception $e)
 			{
-				show_error("Unable to drop Mongo database `{$database}`: {$e->getMessage()}", 500);
+				throw new \Mongo_Exception("Unable to drop Mongo database `{$database}`: {$e->getMessage()}", 500);
 			}
 			
 		}
@@ -201,12 +201,12 @@ class Mongo_DB {
 	{
 		if (empty($db))
 		{
-			show_error('Failed to drop MongoDB collection because database name is empty', 500);
+			throw new \Mongo_Exception('Failed to drop MongoDB collection because database name is empty', 500);
 		}
 	
 		if (empty($col))
 		{
-			show_error('Failed to drop MongoDB collection because collection name is empty', 500);
+			throw new \Mongo_Exception('Failed to drop MongoDB collection because collection name is empty', 500);
 		}
 		
 		else
@@ -218,7 +218,7 @@ class Mongo_DB {
 			}
 			catch (Exception $e)
 			{
-				show_error("Unable to drop Mongo collection `{$col}`: {$e->getMessage()}", 500);
+				throw new \Mongo_Exception("Unable to drop Mongo collection `{$col}`: {$e->getMessage()}", 500);
 			}
 		}
 		
@@ -656,13 +656,8 @@ class Mongo_DB {
 	*	@usage : $mongodb->get('foo', array('bar' => 'something'));
 	*/
 	
-	 public function get($collection = "")
+	 public function get($collection)
 	 {
-	 	if (empty($collection))
-	 	{
-	 		show_error("In order to retrieve documents from MongoDB, a collection name must be passed", 500);
-	 	}
-	
 		// If the ID is not an instance of MongoId (most likely a string) it will fail to match, so convert it
 		if (isset($this->wheres['_id']) and ! ($this->wheres['_id'] instanceof \MongoId))
 		{
@@ -678,7 +673,7 @@ class Mongo_DB {
 	
 		while ($documents->hasNext())
 		{
-		    $returns[] = (object) $documents->getNext();
+		    $returns[] = $documents->getNext();
 		}
 		
 		return $returns;
@@ -710,13 +705,8 @@ class Mongo_DB {
 	*	@usage : $mongodb->get('foo');
 	*/
 	
-	public function count($collection = "")
+	public function count($collection)
 	{
-		if (empty($collection))
-		{
-			show_error("In order to retreive a count of documents from MongoDB, a collection name must be passed", 500);
-		}
-		
 		// If the ID is not an instance of MongoId (most likely a string) it will fail to match, so convert it
 		if (isset($this->wheres['_id']) and ! ($this->wheres['_id'] instanceof \MongoId))
 		{
@@ -738,16 +728,11 @@ class Mongo_DB {
 	*	@usage : $mongodb->insert('foo', $data = array());
 	*/
 	
-	public function insert($collection = "", $insert = array())
+	public function insert($collection, $insert = array())
 	{
-		if (empty($collection))
-		{
-			show_error("No Mongo collection selected to insert into", 500);
-		}
-		
 		if (count($insert) == 0 || !is_array($insert))
 		{
-			show_error("Nothing to insert into Mongo collection or insert is not an array", 500);
+			throw new \Mongo_Exception("Nothing to insert into Mongo collection or insert is not an array", 500);
 		}
 		
 		try
@@ -764,7 +749,7 @@ class Mongo_DB {
 		}
 		catch (MongoCursorException $e)
 		{
-			show_error("Insert of data into MongoDB failed: {$e->getMessage()}", 500);
+			throw new \Mongo_Exception("Insert of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
 	}
 	
@@ -777,17 +762,16 @@ class Mongo_DB {
 	*
 	*	@usage: $mongodb->update('foo', $data = array());
 	*/
-	
-	public function update($collection = "", $data = array(), $options = array())
+	public function update($collection, $data = array(), $options = array())
 	{
-		if (empty($collection))
+		if(isset($data['_id']))
 		{
-			show_error("No Mongo collection selected to update", 500);
+			unset($data['_id']);
 		}
 		
 		if (count($data) == 0 || ! is_array($data))
 		{
-			show_error("Nothing to update in Mongo collection or update is not an array", 500);
+			throw new \Mongo_Exception("Nothing to update in Mongo collection or update is not an array", 500);
 		}
 		
 		// If the ID is not an instance of MongoId (most likely a string) it will fail to match, so convert it
@@ -806,7 +790,7 @@ class Mongo_DB {
 		}
 		catch (MongoCursorException $e)
 		{
-			show_error("Update of data into MongoDB failed: {$e->getMessage()}", 500);
+			throw new \Mongo_Exception("Update of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
 	}
 	
@@ -820,16 +804,16 @@ class Mongo_DB {
 	*	@usage: $mongodb->update_all('foo', $data = array());
 	*/
 	
-	public function update_all($collection = "", $data = array())
+	public function update_all($collection, $data = array())
 	{
-		if (empty($collection))
+		if(isset($data['_id']))
 		{
-			show_error("No Mongo collection selected to update", 500);
+			unset($data['_id']);
 		}
 		
 		if (count($data) == 0 || ! is_array($data))
 		{
-			show_error("Nothing to update in Mongo collection or update is not an array", 500);
+			throw new \Mongo_Exception("Nothing to update in Mongo collection or update is not an array", 500);
 		}
 		
 		try
@@ -840,9 +824,38 @@ class Mongo_DB {
 		}
 		catch (MongoCursorException $e)
 		{
-			show_error("Update of data into MongoDB failed: {$e->getMessage()}", 500);
+			throw new \Mongo_Exception("Update of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
 	}
+	
+	
+	public function merge($collection, $data, $recurse = false)
+	{
+		// For each, might only be one, might be loads. WE JUST DONT KNOW
+		foreach ($this->get($collection) as $document)
+		{
+			$document = (array) $document;
+			
+			// We'll need this for saving
+			$id = $document['_id'];
+			
+			// But nobody should be messing with the _id
+			unset($document['_id']);
+			
+			if(isset($data['_id']))
+			{
+				unset($data['_id']);
+			}
+			
+			// Yeah baby, recurse
+			$document = call_user_func($recurse === false ? 'array_merge' : 'array_merge_recursive', (array) $document, $data);
+			
+			// No matter what where rules were provided, lets update THIS one
+			$this->where('_id', $id)
+				->update($collection, $document);
+		}
+	}
+	
 	
 	/**
 	*	--------------------------------------------------------------------------------
@@ -858,7 +871,7 @@ class Mongo_DB {
 	{
 		if (empty($collection))
 		{
-			show_error("No Mongo collection selected to delete from", 500);
+			throw new \Mongo_Exception("No Mongo collection selected to delete from", 500);
 		}
 		
 		// If the ID is not an instance of MongoId (most likely a string) it will fail to match, so convert it
@@ -877,7 +890,7 @@ class Mongo_DB {
 		}
 		catch (MongoCursorException $e)
 		{
-			show_error("Delete of data into MongoDB failed: {$e->getMessage()}", 500);
+			throw new \Mongo_Exception("Delete of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
 	}
 	
@@ -895,7 +908,7 @@ class Mongo_DB {
 	 {
 		if (empty($collection))
 		{
-			show_error("No Mongo collection selected to delete from", 500);
+			throw new \Mongo_Exception("No Mongo collection selected to delete from", 500);
 		}
 		
 		try
@@ -906,7 +919,7 @@ class Mongo_DB {
 		}
 		catch (MongoCursorException $e)
 		{
-			show_error("Delete of data into MongoDB failed: {$e->getMessage()}", 500);
+			throw new \Mongo_Exception("Delete of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
 	}
 	
@@ -931,7 +944,7 @@ class Mongo_DB {
 		
 		catch (MongoCursorException $e)
 		{
-			show_error("MongoDB command failed to execute: {$e->getMessage()}", 500);
+			throw new \Mongo_Exception("MongoDB command failed to execute: {$e->getMessage()}", 500);
 		}
 	}
 	
@@ -951,12 +964,12 @@ class Mongo_DB {
 	{
 		if (empty($collection))
 		{
-			show_error("No Mongo collection specified to add index to", 500);
+			throw new \Mongo_Exception("No Mongo collection specified to add index to", 500);
 		}
 		
 		if (empty($keys) || ! is_array($keys))
 		{
-			show_error("Index could not be created to MongoDB Collection because no keys were specified", 500);
+			throw new \Mongo_Exception("Index could not be created to MongoDB Collection because no keys were specified", 500);
 		}
 
 		foreach ($keys as $col => $val)
@@ -978,7 +991,7 @@ class Mongo_DB {
 		}
 		else
 		{
-			show_error("An error occured when trying to add an index to MongoDB Collection", 500);
+			throw new \Mongo_Exception("An error occured when trying to add an index to MongoDB Collection", 500);
 		}
 	}
 	
@@ -1000,12 +1013,12 @@ class Mongo_DB {
 	{
 		if (empty($collection))
 		{
-			show_error("No Mongo collection specified to remove index from", 500);
+			throw new \Mongo_Exception("No Mongo collection specified to remove index from", 500);
 		}
 		
 		if (empty($keys) || ! is_array($keys))
 		{
-			show_error("Index could not be removed from MongoDB Collection because no keys were specified", 500);
+			throw new \Mongo_Exception("Index could not be removed from MongoDB Collection because no keys were specified", 500);
 		}
 		
 		if ($this->db->{$collection}->deleteIndex($keys, $options) == TRUE)
@@ -1015,7 +1028,7 @@ class Mongo_DB {
 		}
 		else
 		{
-			show_error("An error occured when trying to remove an index from MongoDB Collection", 500);
+			throw new \Mongo_Exception("An error occurred when trying to remove an index from MongoDB Collection", 500);
 		}
 	}
 	
@@ -1032,7 +1045,7 @@ class Mongo_DB {
 	{
 		if (empty($collection))
 		{
-			show_error("No Mongo collection specified to remove all indexes from", 500);
+			throw new \Mongo_Exception("No Mongo collection specified to remove all indexes from", 500);
 		}
 		$this->db->{$collection}->deleteIndexes();
 		$this->_clear();
@@ -1052,7 +1065,7 @@ class Mongo_DB {
 	{
 		if (empty($collection))
 		{
-			show_error("No Mongo collection specified to remove all indexes from", 500);
+			throw new \Mongo_Exception("No Mongo collection specified to remove all indexes from", 500);
 		}
 		
 		return ($this->db->{$collection}->getIndexInfo());
