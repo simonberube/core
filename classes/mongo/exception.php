@@ -14,4 +14,4 @@
 
 namespace Fuel\Core;
 
-class MongoDB_Exception extends Fuel_Exception {}
+class Mongo_Exception extends Fuel_Exception {}

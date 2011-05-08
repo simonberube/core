@@ -34,6 +34,7 @@ class Mongo_DB {
 	protected $selects = array();
 	public $wheres = array();	// $wheres is public for sanity reasons - useful for debuggging
 	protected $sorts = array();
+	protected $updates = array();
 	protected $limit = 999999;
 	protected $offset = 0;
 	
@@ -281,17 +282,20 @@ class Mongo_DB {
 	
 	public function where($wheres, $value = null)
 	{
-		if (is_array($wheres))
+		if ( ! is_array($wheres))
 		{
-			foreach ($wheres as $wh => $val)
-			{
-				$this->wheres[$wh] = $val;
-			}
+			$wheres = array($wheres => $value);
 		}
-		
-		else
+	
+		foreach ($wheres as $wh => $val)
 		{
-			$this->wheres[$wheres] = $value;
+			// If the ID is not an instance of MongoId (most likely a string) it will fail to match, so convert it
+			if ($wh == '_id' and ! ($val instanceof \MongoId))
+			{
+				$val = new \MongoId($val);
+			}
+			
+			$this->wheres[$wh] = $val;
 		}
 		
 		return $this;
@@ -515,7 +519,7 @@ class Mongo_DB {
 	
 	/**
 	*	--------------------------------------------------------------------------------
-	*	LIKE PARAMETERS
+	*	Like
 	*	--------------------------------------------------------------------------------
 	*	
 	*	Get the documents where the (string) value of a $field is like a value. The defaults
@@ -540,7 +544,7 @@ class Mongo_DB {
 	*	to the search value, representing only searching for a value at the end of 
 	*	a line.
 	*
-	*	@usage : $mongodb->like('foo', 'bar', 'im', FALSE, TRUE);
+	*	@usage : $this->mongo_db->like('foo', 'bar', 'im', FALSE, TRUE);
 	*/
 	
 	public function like($field = "", $value = "", $flags = "i", $enable_start_wildcard = TRUE, $enable_end_wildcard = TRUE)
@@ -562,19 +566,19 @@ class Mongo_DB {
 	 	
 	 	$regex = "/$value/$flags";
 	 	$this->wheres[$field] = new MongoRegex($regex);
-	 	return $this;
+	 	return ($this);
 	 }
 	
 	/**
 	*	--------------------------------------------------------------------------------
-	*	ORDER BY PARAMETERS
+	*	// Order by
 	*	--------------------------------------------------------------------------------
 	*
 	*	Sort the documents based on the parameters passed. To set values to descending order,
 	*	you must pass values of either -1, FALSE, 'desc', or 'DESC', else they will be
 	*	set to 1 (ASC).
 	*
-	*	@usage : $mongodb->where_between('foo', 20, 30);
+	*	@usage : $this->mongo_db->where_between('foo', 20, 30);
 	*/
 	
 	public function order_by($fields = array())
@@ -590,17 +594,17 @@ class Mongo_DB {
 				$this->sorts[$col] = 1;
 			}
 		}
-		return $this;
+		return ($this);
 	}
 	
 	/**
 	*	--------------------------------------------------------------------------------
-	*	LIMIT DOCUMENTS
+	*	// Limit results
 	*	--------------------------------------------------------------------------------
 	*
 	*	Limit the result set to $x number of documents
 	*
-	*	@usage : $mongodb->limit($x);
+	*	@usage : $this->mongo_db->limit($x);
 	*/
 	
 	public function limit($x = 99999)
@@ -609,17 +613,17 @@ class Mongo_DB {
 		{
 			$this->limit = (int) $x;
 		}
-		return $this;
+		return ($this);
 	}
 	
 	/**
 	*	--------------------------------------------------------------------------------
-	*	OFFSET DOCUMENTS
+	*	// Offset
 	*	--------------------------------------------------------------------------------
 	*
 	*	Offset the result set to skip $x number of documents
 	*
-	*	@usage : $mongodb->offset($x);
+	*	@usage : $this->mongo_db->offset($x);
 	*/
 	
 	public function offset($x = 0)
@@ -628,7 +632,7 @@ class Mongo_DB {
 		{
 			$this->offset = (int) $x;
 		}
-		return $this;
+		return ($this);
 	}
 	
 	/**
@@ -658,12 +662,6 @@ class Mongo_DB {
 	
 	 public function get($collection)
 	 {
-		// If the ID is not an instance of MongoId (most likely a string) it will fail to match, so convert it
-		if (isset($this->wheres['_id']) and ! ($this->wheres['_id'] instanceof \MongoId))
-		{
-			$this->wheres['_id'] = new \MongoId($this->wheres['_id']);
-		}
-		
 	 	$documents = $this->db->{$collection}->find($this->wheres, $this->selects)->limit((int) $this->limit)->skip((int) $this->offset)->sort($this->sorts);
 	 	
 	 	// Clear
@@ -707,12 +705,6 @@ class Mongo_DB {
 	
 	public function count($collection)
 	{
-		// If the ID is not an instance of MongoId (most likely a string) it will fail to match, so convert it
-		if (isset($this->wheres['_id']) and ! ($this->wheres['_id'] instanceof \MongoId))
-		{
-			$this->wheres['_id'] = new \MongoId($this->wheres['_id']);
-		}
-		
 		$count = $this->db->{$collection}->find($this->wheres)->limit((int) $this->limit)->skip((int) $this->offset)->count();
 		$this->_clear();
 		return ($count);
@@ -720,24 +712,24 @@ class Mongo_DB {
 	
 	/**
 	*	--------------------------------------------------------------------------------
-	*	INSERT
+	*	//! Insert
 	*	--------------------------------------------------------------------------------
 	*
 	*	Insert a new document into the passed collection
 	*
-	*	@usage : $mongodb->insert('foo', $data = array());
+	*	@usage : $this->mongo_db->insert('foo', $data = array());
 	*/
 	
 	public function insert($collection, $insert = array())
 	{
 		if (count($insert) == 0 || !is_array($insert))
 		{
-			throw new \Mongo_Exception("Nothing to insert into Mongo collection or insert is not an array", 500);
+			show_error("Nothing to insert into Mongo collection or insert is not an array", 500);
 		}
 		
 		try
 		{
-			$this->db->{$collection}->insert($insert, array('fsync' => TRUE));
+			$this->db->{$collection}->insert($insert);
 			if (isset($insert['_id']))
 			{
 				return ($insert['_id']);
@@ -749,114 +741,225 @@ class Mongo_DB {
 		}
 		catch (MongoCursorException $e)
 		{
-			throw new \Mongo_Exception("Insert of data into MongoDB failed: {$e->getMessage()}", 500);
+			show_error("Insert of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
 	}
 	
+	
 	/**
 	*	--------------------------------------------------------------------------------
-	*	UPDATE
+	*	//! Update
 	*	--------------------------------------------------------------------------------
 	*
 	*	Updates a single document
 	*
-	*	@usage: $mongodb->update('foo', $data = array());
+	*	@usage: $this->mongo_db->update('foo', $data = array());
 	*/
+	
 	public function update($collection, $data = array(), $options = array())
 	{
-		if(isset($data['_id']))
+		if (is_array($data) && count($data) > 0)
 		{
-			unset($data['_id']);
-		}
-		
-		if (count($data) == 0 || ! is_array($data))
-		{
-			throw new \Mongo_Exception("Nothing to update in Mongo collection or update is not an array", 500);
-		}
-		
-		// If the ID is not an instance of MongoId (most likely a string) it will fail to match, so convert it
-		if (isset($this->wheres['_id']) and ! ($this->wheres['_id'] instanceof \MongoId))
-		{
-			$this->wheres['_id'] = new \MongoId($this->wheres['_id']);
+			array_merge($data, $this->updates);
 		}
 		
 		try
 		{
-			$options = array_merge($options, array('fsync' => TRUE, 'multiple' => FALSE));
+			$options = array_merge($options, array('multiple' => FALSE));
 			
-			$this->db->{$collection}->update($this->wheres, array('$set' => $data), $options);
+			$this->db->{$collection}->update($this->wheres, $this->updates, $options);
 			$this->_clear();
-			return true;
+			return (TRUE);
 		}
 		catch (MongoCursorException $e)
 		{
-			throw new \Mongo_Exception("Update of data into MongoDB failed: {$e->getMessage()}", 500);
+			show_error("Update of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
 	}
 	
+	
 	/**
 	*	--------------------------------------------------------------------------------
-	*	UPDATE_ALL
+	*	Update all
 	*	--------------------------------------------------------------------------------
 	*
 	*	Updates a collection of documents
 	*
-	*	@usage: $mongodb->update_all('foo', $data = array());
+	*	@usage: $this->mongo_db->update_all('foo', $data = array());
 	*/
 	
 	public function update_all($collection, $data = array())
 	{
-		if(isset($data['_id']))
-		{
-			unset($data['_id']);
-		}
-		
 		if (count($data) == 0 || ! is_array($data))
 		{
-			throw new \Mongo_Exception("Nothing to update in Mongo collection or update is not an array", 500);
+			show_error("Nothing to update in Mongo collection or update is not an array", 500);
 		}
 		
 		try
 		{
-			$this->db->{$collection}->update($this->wheres, array('$set' => $data), array('fsync' => TRUE, 'multiple' => TRUE));
+			$this->db->{$collection}->update($this->wheres, array('$set' => $data), array('multiple' => TRUE));
 			$this->_clear();
-			return true;
+			return (TRUE);
 		}
 		catch (MongoCursorException $e)
 		{
-			throw new \Mongo_Exception("Update of data into MongoDB failed: {$e->getMessage()}", 500);
+			show_error("Update of data into MongoDB failed: {$e->getMessage()}", 500);
 		}
 	}
 	
 	
-	public function merge($collection, $data, $recurse = false)
+	/**
+	*	--------------------------------------------------------------------------------
+	*	Inc
+	*	--------------------------------------------------------------------------------
+	*
+	*	Updates a collection of documents
+	*
+	*	@usage: $this->mongo_db->update_all('foo', $data = array());
+	*/
+	public function inc($fields = array(), $value = 0)
 	{
-		// For each, might only be one, might be loads. WE JUST DONT KNOW
-		foreach ($this->get($collection) as $document)
+		$this->_update_init('$inc');
+		
+		if (is_string($fields))
 		{
-			$document = (array) $document;
-			
-			// We'll need this for saving
-			$id = $document['_id'];
-			
-			// But nobody should be messing with the _id
-			unset($document['_id']);
-			
-			if(isset($data['_id']))
-			{
-				unset($data['_id']);
-			}
-			
-			// Yeah baby, recurse
-			$document = call_user_func($recurse === false ? 'array_merge' : 'array_merge_recursive', (array) $document, $data);
-			
-			// No matter what where rules were provided, lets update THIS one
-			$this->where('_id', $id)
-				->update($collection, $document);
+			$this->updates['$inc'][$fields] = $value;
 		}
+		
+		elseif (is_array($fields))
+		{
+			foreach ($fields as $field => $value)
+			{
+				$this->updates['$inc'][$field] = $value;
+			}
+		}
+		
+		return $this;
 	}
 	
+	public function set($fields, $value = NULL)
+	{
+		$this->_update_init('$set');
+		
+		if (is_string($fields))
+		{
+			$this->updates['$set'][$fields] = $value;
+		}
+		
+		elseif (is_array($fields))
+		{
+			foreach ($fields as $field => $value)
+			{
+				$this->updates['$set'][$field] = $value;
+			}
+		}
+		return $this;
+	}
 	
+	public function unset_field($fields)
+	{
+		$this->_update_init('$unset');
+		
+		if (is_string($fields))
+		{
+			$this->updates['$unset'][] = array($fields => 1);
+		}
+		
+		elseif (is_array($fields))
+		{
+			foreach ($fields as $field)
+			{
+				$this->updates['$unset'][] = array($field => 1);
+			}
+		}
+		return $this;
+	}
+	
+	public function push($fields, $value = array())
+	{
+		$this->_update_init('$push');
+		
+		if (is_string($fields))
+		{
+			$this->updates['$push'][$fields] = $value;
+		}
+		
+		elseif (is_array($fields))
+		{
+			foreach ($fields as $field => $value)
+			{
+				$this->updates['$push'][$field] = $value;
+			}
+		}
+		return $this;
+	}
+	
+	public function push_all($fields, $value = array())
+	{
+		$this->_update_init('$pushAll');
+		
+		if (is_string($fields))
+		{
+			$this->updates['$pushAll'][] = array($fields => $value);
+		}
+		
+		elseif (is_array($fields))
+		{
+			foreach ($fields as $field => $value)
+			{
+				$this->updates['$pushAll'][] = array($field => $value);
+			}
+		}
+		return $this;
+	}
+	
+	public function pop($field)
+	{
+		$this->_update_init('$pop');
+		
+		if (is_string($field))
+		{
+			$this->updates['$pop'][$field] = -1;
+		}
+		
+		elseif (is_array($fields))
+		{
+			foreach ($fields as $field)
+			{
+				$this->updates['$pop'][$field] = -1;
+			}
+		}
+		return $this;
+	}
+
+		
+	public function pull($field = "", $value = "")
+	{
+		$this->_update_init('$pull');
+	
+		$this->updates['$pull'][$field] = $value;
+		
+		return $this;
+	}
+	
+	public function pull_all($field = "", $values = array())
+	{
+		$this->_update_init('$pullAll');
+	
+		$this->updates['$pull'][$field] = $values;
+		
+		return $this;
+	}
+	
+	public function rename_field($old, $new)
+	{
+		$this->_update_init('$rename');
+	
+		$this->updates['$rename'][] = array($old => $new);
+		
+		return $this;
+	}
+		
 	/**
 	*	--------------------------------------------------------------------------------
 	*	DELETE
@@ -871,13 +974,7 @@ class Mongo_DB {
 	{
 		if (empty($collection))
 		{
-			throw new \Mongo_Exception("No Mongo collection selected to delete from", 500);
-		}
-		
-		// If the ID is not an instance of MongoId (most likely a string) it will fail to match, so convert it
-		if (isset($this->wheres['_id']) and ! ($this->wheres['_id'] instanceof \MongoId))
-		{
-			$this->wheres['_id'] = new \MongoId($this->wheres['_id']);
+			throw new \Mongo_Exception("No Mongo collection selected to delete from");
 		}
 		
 		try
@@ -1087,6 +1184,7 @@ class Mongo_DB {
 		$this->limit	= 999999;
 		$this->offset	= 0;
 		$this->sorts	= array();
+		$this->updates	= array();
 	}
 
 	/**
@@ -1105,5 +1203,20 @@ class Mongo_DB {
 		}
 	}
 	
+	/**
+	*	--------------------------------------------------------------------------------
+	*	Update initializer
+	*	--------------------------------------------------------------------------------
+	*
+	*	Prepares parameters for insertion in $updates array().
+	*/
+	
+	private function _update_init($method)
+	{
+		if ( ! isset($this->updates[$method]))
+		{
+			$this->updates[ $method ] = array();
+		}
+	}
 }
 /* End of file classes/mongodb.php */
