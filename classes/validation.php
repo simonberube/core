@@ -112,7 +112,7 @@ class Validation {
 		}
 		else
 		{
-			$this->fieldset = Fieldset::factory($fieldset, array('validation_instance' => $this));
+			$this->fieldset = \Fieldset::factory($fieldset, array('validation_instance' => $this));
 		}
 
 		$this->callables = array($this);
@@ -440,7 +440,7 @@ class Validation {
 	 */
 	public function _validation_required($val)
 	{
-		return ($val !== false && $val !== null && $val !== '');
+		return ($val !== false && $val !== null && $val !== '' && $val !== array());
 	}
 
 	/**

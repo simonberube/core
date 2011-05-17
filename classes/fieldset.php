@@ -45,7 +45,7 @@ class Fieldset
 			return $exists;
 		}
 
-		static::$_instances[$name] = new Fieldset($name, $config);
+		static::$_instances[$name] = new static($name, $config);
 
 		if ($name == 'default')
 		{
@@ -205,7 +205,7 @@ class Fieldset
 			return $field;
 		}
 
-		$field = new Fieldset_Field($name, $label, $attributes, $rules, $this);
+		$field = new \Fieldset_Field($name, $label, $attributes, $rules, $this);
 		$this->fields[$name] = $field;
 
 		return $field;
@@ -244,14 +244,14 @@ class Fieldset
 	 */
 	public function add_model($class, $instance = null, $method = 'set_form_fields')
 	{
+		// Add model to validation callables for validation rules
+		$this->validation()->add_callable($class);
+
 		if ((is_string($class) and is_callable($callback = array('\\'.$class, $method)))
 			|| is_callable($callback = array($class, $method)))
 		{
 			$instance ? call_user_func($callback, $this, $instance) : call_user_func($callback, $this);
 		}
-
-		// Add model to validation callables for validation rules
-		$this->validation()->add_callable($class);
 
 		return $this;
 	}

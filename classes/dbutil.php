@@ -26,11 +26,13 @@ class DBUtil {
 	 *
 	 * @throws	Fuel\Database_Exception
 	 * @param	string	$database	the database name
+	 * @param	string	$database	the character set
 	 * @return	int		the number of affected rows
 	 */
-	public static function create_database($database)
+	public static function create_database($database, $charset = null)
 	{
-		return DB::query('CREATE DATABASE '.DB::quote_identifier($database), \DB::UPDATE)->execute();
+		$charset = static::process_charset($charset, true);
+		return DB::query('CREATE DATABASE '.DB::quote_identifier($database).$charset, \DB::UPDATE)->execute();
 	}
 
 	/**
@@ -70,7 +72,7 @@ class DBUtil {
 		return DB::query('RENAME TABLE '.DB::quote_identifier(DB::table_prefix($table)).' TO '.DB::quote_identifier(DB::table_prefix($new_table_name)),DB::UPDATE)->execute();
 	}
 
-	public static function create_table($table, $fields, $primary_keys = array(), $if_not_exists = true, $engine = false)
+	public static function create_table($table, $fields, $primary_keys = array(), $if_not_exists = true, $engine = false, $charset = null)
 	{
 		$sql = 'CREATE TABLE';
 
@@ -84,8 +86,9 @@ class DBUtil {
 			$primary_keys = DB::quote_identifier($primary_keys);
 			$sql .= ",\n\tPRIMARY KEY ".$key_name." (" . implode(', ', $primary_keys) . ")";
 		}
-		$engine = ($engine !== false) ? ' ENGINE = '.$engine.' ' : '';
-		$sql .= "\n)".$engine.";";
+		$sql .= "\n)";
+		$sql .= ($engine !== false) ? ' ENGINE = '.$engine.' ' : '';
+		$sql .= static::process_charset($charset, true).";";
 
 		return DB::query($sql, DB::UPDATE)->execute();
 	}
@@ -100,10 +103,20 @@ class DBUtil {
 	 */
 	public static function add_fields($table, $fields)
 	{
-		$sql = 'ALTER TABLE '.DB::quote_identifier(DB::table_prefix($table)).' ADD (';
-		$sql .= static::process_fields($fields);
-		$sql .= "\n);";
-		return DB::query($sql, DB::UPDATE)->execute();
+		return static::alter_fields('ADD', $table, $fields);
+	}
+
+	/**
+	 * Modifies fields in a table.  Will throw a Database_Exception if it cannot.
+	 *
+	 * @throws	Fuel\Database_Exception
+	 * @param	string	$table			the table name
+	 * @param	array	$fields			the modified fields
+	 * @return	int		the number of affected
+	 */
+	public static function modify_fields($table, $fields)
+	{
+		return static::alter_fields('CHANGE', $table, $fields);
 	}
 	
 	/**
@@ -116,14 +129,26 @@ class DBUtil {
 	 */
 	public static function drop_fields($table, $fields)
 	{
-		if( ! is_array($fields))
+		return static::alter_fields('DROP', $table, $fields);
+	}
+
+	protected static function alter_fields($type, $table, $fields)
+	{
+		$sql = 'ALTER TABLE '.DB::quote_identifier(DB::table_prefix($table)).' '.$type.' ';
+		if ($type === 'DROP')
 		{
-			$fields = array($fields);
+			if( ! is_array($fields))
+			{
+				$fields = array($fields);
+			}
+			$fields = array_map(function($field){
+				return DB::quote_identifier($field);
+			}, $fields);
+			$sql .= implode(', ', $fields);
+		} else {
+			$sql .= static::process_fields($fields);
 		}
-		$fields = array_map(function($field){
-			return DB::quote_identifier($field);
-		}, $fields);
-		return DB::query('ALTER TABLE '.DB::quote_identifier(DB::table_prefix($table)).' DROP '.implode(', DROP ', $fields))->execute();
+		return DB::query($sql, DB::UPDATE)->execute();
 	}
 
 	protected static function process_fields($fields)
@@ -139,7 +164,7 @@ class DBUtil {
 			$sql .= array_key_exists('NAME', $attr) ? ' '.DB::quote_identifier($attr['NAME']).' ' : '';
 			$sql .= array_key_exists('TYPE', $attr) ? ' '.$attr['TYPE'] : '';
 			$sql .= array_key_exists('CONSTRAINT', $attr) ? '('.$attr['CONSTRAINT'].')' : '';
-			$sql .= array_key_exists('CHARSET', $attr) ? ' CHARACTER SET '.substr($attr['CHARSET'], 0, stripos($attr['CHARSET'], '_')).' COLLATE '.$attr['CHARSET'] : '';
+			$sql .= array_key_exists('CHARSET', $attr) ? static::process_charset($attr['CHARSET']) : '';
 
 			if (array_key_exists('UNSIGNED', $attr) and $attr['UNSIGNED'] === true)
 			{
@@ -157,6 +182,35 @@ class DBUtil {
 		}
 
 		return \implode(',', $sql_fields);
+	}
+	
+	/**
+	 * Formats the default charset.
+	 *
+	 * @param    string    $charset       the character set
+	 * @param    bool      $is_default    whether to use default
+	 * @return   string    the formated charset sql
+	 */
+	protected static function process_charset($charset = null, $is_default = false)
+	{
+		$charset or $charset = Config::get('db.'.Config::get('environment').'.charset', null);
+		if(empty($charset))
+		{
+			return '';
+		}
+		
+		if(($pos = stripos($charset, '_')) !== false)
+		{
+			$charset = ' CHARACTER SET '.substr($charset, 0, $pos).' COLLATE '.$charset;
+		}
+		else
+		{
+			$charset = ' CHARACTER SET '.$charset;
+		}
+		
+		$is_default and $charset = ' DEFAULT'.$charset;
+		
+		return $charset;
 	}
 
 	/**
@@ -242,6 +296,15 @@ class DBUtil {
 			\Log::write(ucfirst($type), 'Table: '.$table.', Operation: '.$operation.', Message: '.$result->get('Msg_text'), 'DBUtil::table_maintenance');
 		}
 		return false;
+	}
+	
+	/*
+	 * Load the db config, the Database_Connection might not have fired jet.
+	 *
+	 */
+	public static function _init()
+	{
+		\Config::load('db', true);
 	}
 
 }
