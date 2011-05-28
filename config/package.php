@@ -23,4 +23,4 @@ return array(
 
 );
 
-/* End of file config.php */
+/* End of file package.php */
